@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+function index-ok {
+  cat <<EOF
+<script>
+$1
+</script>
+EOF
+}
+export -f index-ok
+
+function index-err {
+  cat <<EOF
+<script>
+console.log(\`
+Error!
+
+$1
+\`)
+</script>
+EOF
+}
+export -f index-err
+
+function tsc {
+  yarn exec --silent -- tsc
+}
+export -f tsc
+
+function http-handler {
+  if res=$(tsc 2>&1); then
+    code="200 OK"
+    body=$(index-ok "$(cat piste.js)")
+  else
+    code="500 Internal Server Error"
+    body=$(index-err "$res")
+  fi
+  cat <<RESPONSE
+HTTP/1.0 $code
+Server: some real hacky shit
+Date: $(date)
+Content-type: text/html; charset=utf-8
+Content-Length: ${#body}
+
+$body
+RESPONSE
+}
+export -f http-handler
+
+port=8000
+echo "Listening on $port" >&2
+ncat -kl localhost "$port" -c 'bash -c http-handler'

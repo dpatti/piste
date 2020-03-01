@@ -1,0 +1,6 @@
+{
+  "license": "MIT",
+  "dependencies": {
+    "typescript": "^3.8.3"
+  }
+}

@@ -9,7 +9,6 @@ Expr.equal = (x, y) =>
   x.comp == y.comp
     && x.args.length === y.args.length
     && x.args.every((a, i) => Expr.equal(a, y.args[i]));
-Expr.toString = (x) => print(x);
 
 const apply = (x, ...ys) => {
   let { comp, args } = x;
@@ -20,7 +19,7 @@ const S = Computation('S', (x, y, z) => apply(apply(x, z), apply(y, z)));
 const K = Computation('K', (x, y) => x);
 const I = Computation('I', (x) => x);
 
-const eval = (expr) => {
+Expr.eval = (expr) => {
   let { comp, args } = expr;
   if (args.length >= comp.f.length) {
     let [used, rest] = split(args, comp.f.length);
@@ -35,7 +34,7 @@ const fixScan = (expr, gas=100) => {
     console.error("gas exhausted");
     return []
   }
-  let next = eval(expr);
+  let next = Expr.eval(expr);
   if (Expr.equal(expr, next)) {
     return [expr];
   } else {
@@ -52,7 +51,7 @@ const squash = (exprs) => {
 const symbols = (expr) =>
   [expr.comp.alias, ...expr.args.map(symbols)];
 
-const print = (expr) => {
+Expr.toString = (expr) => {
   const chain = (syms) => syms.map(format).join('');
   const format = (syms) => {
     if (Array.isArray(syms)) {
@@ -68,7 +67,7 @@ const print = (expr) => {
   return chain(symbols(expr));
 };
 
-const parse = (str) => {
+Expr.parse = (str) => {
   // Obviously first we write a parser combinator library
   const _ = (a, str) => [a, str];
   const pure = (a) => (str) => [_(a, str)];
@@ -92,8 +91,8 @@ const parse = (str) => {
     return t
   };
   const run = (t, str) => {
-    for ([a, str] of t(str)) {
-      if (str === '') return a;
+    for (let [a, unconsumed] of t(str)) {
+      if (unconsumed === '') return a;
     }
 
     console.error(t(str));
@@ -120,7 +119,7 @@ const parse = (str) => {
 };
 
 console.log(
-`parse : string -> t
-print : t -> string
-eval : t -> t
-fixScan : t -> t list`);
+`Expr.parse : string -> t
+Expr.toString : t -> string
+Expr.eval : t -> t
+Expr.fixScan : t -> t list`);
