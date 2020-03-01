@@ -31,7 +31,7 @@ Expr.eval = (expr) => {
   }
 }
 
-const fixScan = (expr, gas=100) => {
+Expr.fixScan = (expr, gas=100) => {
   if (gas <= 0) {
     console.error("gas exhausted");
     return []
@@ -40,18 +40,18 @@ const fixScan = (expr, gas=100) => {
   if (Expr.equal(expr, next)) {
     return [expr];
   } else {
-    return [expr, ...fixScan(next, gas - 1)];
+    return [expr, ...Expr.fixScan(next, gas - 1)];
   }
 }
 
-const squash = (exprs) => {
+Expr.squash = (exprs) => {
   if (exprs.length == 0) throw Error("squash: empty list");
   let { comp, args } = exprs[0];
   return Expr(comp, args.concat(exprs.slice(1)));
 }
 
-const symbols = (expr) =>
-  [expr.comp.alias, ...expr.args.map(symbols)];
+Expr.symbols = (expr) =>
+  [expr.comp.alias, ...expr.args.map(Expr.symbols)];
 
 Expr.toString = (expr) => {
   const chain = (syms) => syms.map(format).join('');
@@ -66,7 +66,7 @@ Expr.toString = (expr) => {
       return syms;
     }
   };
-  return chain(symbols(expr));
+  return chain(Expr.symbols(expr));
 };
 
 Expr.parse = (str) => {
@@ -83,6 +83,8 @@ Expr.parse = (str) => {
   const ignore = <a>(t: Parser<a>): Parser<any> => map(t, _ => undefined);
   const alt = <a>(...ts: Parser<a>[]): Parser<a> =>
     (str) => ts.flatMap(t => t(str));
+  // This is a bit of an unsafe way to chain expressions. Maybe it's not worth
+  // the hassle.
   const seq = <a>(...ts: Parser<a>[]): Parser<a[]> =>
     (ts.length === 0)
       ? pure([])
@@ -93,6 +95,8 @@ Expr.parse = (str) => {
 
     return alt(more, done);
   };
+  const bracket = <a>(t: Parser<a>, left: Parser<any>, right: Parser<any>): Parser<a> =>
+    bind(left, _ => bind(t, t => bind(right, _ => pure(t))));
   const fix = <a>(f: (_: Parser<a>) => Parser<a>) => {
     let t = (str) => f(t)(str);
     return t
@@ -117,18 +121,12 @@ Expr.parse = (str) => {
     );
 
   const group = (p: Parser<Expr>): Parser<Expr> =>
-    map(
-      seq(
-        ignore(char('(')),
-        p,
-        ignore(char(')'))
-      ),
-      ([_l, ps, _r]) => ps);
+    bracket(p, char('('), char(')'));
 
   const expr: Parser<Expr> =
     fix(expr =>
       bind(many(alt(symbol, group(expr))), exprs =>
-        (exprs.length > 0) ? pure(squash(exprs)) : fail));
+        (exprs.length > 0) ? pure(Expr.squash(exprs)) : fail));
 
   return run(expr, str);
 };
